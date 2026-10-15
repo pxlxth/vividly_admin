@@ -38,10 +38,13 @@ class _AdminDashboardContentState
 
   @override
   Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.all(40),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+   return SingleChildScrollView(
+  padding: const EdgeInsets.fromLTRB(24, 24, 24, 24),
+  child: Align(
+    alignment: Alignment.topLeft,
+    child: Column(
+      mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
             'Dashboard',
@@ -59,7 +62,7 @@ class _AdminDashboardContentState
             ),
           ),
 
-          const SizedBox(height: 40),
+          const SizedBox(height: 24),
 
           FutureBuilder<List<int>>(
             future: _dashboardData,
@@ -82,35 +85,54 @@ class _AdminDashboardContentState
 
               final data = snapshot.data ?? [0, 0, 0];
 
-              return Row(
-                children: [
-                  _DashboardCard(
-                    title: 'Tópicos',
-                    value: data[0].toString(),
-                    icon: Icons.category_outlined,
-                  ),
+           return LayoutBuilder(
+                builder: (context, constraints) {
+                  final isSmall = constraints.maxWidth < 600;
+                  final spacing = 20.0;
+                  final columns = isSmall ? 1 : 3;
 
-                  const SizedBox(width: 20),
+                  final cardWidth = columns == 1
+                      ? constraints.maxWidth
+                      : (constraints.maxWidth - spacing * (columns - 1)) /
+                          columns;
 
-                  _DashboardCard(
-                    title: 'Lecciones',
-                    value: data[1].toString(),
-                    icon: Icons.menu_book_outlined,
-                  ),
-
-                  const SizedBox(width: 20),
-
-                  _DashboardCard(
-                    title: 'Usuarios',
-                    value: data[2].toString(),
-                    icon: Icons.people_outline,
-                  ),
-                ],
+                  return Wrap(
+                    spacing: spacing,
+                    runSpacing: spacing,
+                    children: [
+                      SizedBox(
+                        width: cardWidth,
+                        child: _DashboardCard(
+                          title: 'Tópicos',
+                          value: data[0].toString(),
+                          icon: Icons.category_outlined,
+                        ),
+                      ),
+                      SizedBox(
+                        width: cardWidth,
+                        child: _DashboardCard(
+                          title: 'Lecciones activas',
+                          value: data[1].toString(),
+                          icon: Icons.menu_book_outlined,
+                        ),
+                      ),
+                      SizedBox(
+                        width: cardWidth,
+                        child: _DashboardCard(
+                          title: 'Usuarios',
+                          value: data[2].toString(),
+                          icon: Icons.people_outline,
+                        ),
+                      ),
+                    ],
+                  );
+                },
               );
             },
           ),
         ],
       ),
+  ),
     );
   }
 }
@@ -128,10 +150,9 @@ class _DashboardCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Expanded(
-      child: Container(
-        height: 140,
-        padding: const EdgeInsets.all(24),
+   return Container(
+        constraints: const BoxConstraints(minHeight: 120),
+       padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
           color: Colors.white,
           borderRadius: BorderRadius.circular(10),
@@ -140,39 +161,41 @@ class _DashboardCard extends StatelessWidget {
           ),
         ),
         child: Row(
-          children: [
-            Icon(
-              icon,
-              size: 32,
-              color: AppColors.green,
-            ),
-
-            const SizedBox(width: 18),
-
-            Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Text(
-                  title,
-                  style: AppTextStyles.body.copyWith(
-                    color: Colors.black54,
-                  ),
+            children: [
+              Icon(
+                icon,
+                size: 24,
+                color: AppColors.green,
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Text(
+                      title,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: AppTextStyles.body.copyWith(
+                        color: Colors.black54,
+                      ),
+                    ),
+                    const SizedBox(height: 6),
+                    Text(
+                      value,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: AppTextStyles.h2.copyWith(
+                        color: AppColors.darkBrown,
+                      ),
+                    ),
+                  ],
                 ),
-
-                const SizedBox(height: 6),
-
-                Text(
-                  value,
-                  style: AppTextStyles.h2.copyWith(
-                    color: AppColors.darkBrown,
-                  ),
-                ),
-              ],
-            ),
-          ],
-        ),
-      ),
+              ),
+            ],
+          )
+      
     );
   }
 }

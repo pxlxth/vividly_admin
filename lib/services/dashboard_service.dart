@@ -11,13 +11,14 @@ class DashboardService {
     return response.length;
   }
 
-  Future<int> getLessonsCount() async {
-    final response = await _supabase
-        .from('lessons')
-        .select('id');
-
-    return response.length;
-  }
+//only for active lessons
+Future<int> getLessonsCount() async {
+  final response = await _supabase
+      .from('lessons')
+      .select('id')
+      .eq('is_published', true);
+  return response.length;
+}
 
   Future<int> getUsersCount() async {
     final response = await _supabase

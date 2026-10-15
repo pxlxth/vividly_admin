@@ -21,22 +21,14 @@ class TopicsScreen extends StatefulWidget {
 
 class _TopicsScreenState extends State<TopicsScreen> {
   final TextEditingController _searchController = TextEditingController();
-
   final TopicService _topicService = TopicService();
-
   late Future<List<Topic>> _topicsFuture;
-
-  String _selectedFilter = 'fecha';
-
+  String _selectedFilter = 'az';
   String? _editingTopicId;
-
   final ScrollController _verticalController = ScrollController();
-
-  final TextEditingController _editNameEsController =
-      TextEditingController();
-
-  final TextEditingController _editNameEnController =
-      TextEditingController();
+  final TextEditingController _editNameEsController = TextEditingController();
+  final TextEditingController _editNameEnController = TextEditingController();
+  late Future<Map<String, int>> _lessonCountsFuture;
 
   @override
   void initState() {
@@ -46,6 +38,7 @@ class _TopicsScreenState extends State<TopicsScreen> {
       '',
       filter: _selectedFilter,
     );
+    _lessonCountsFuture = _topicService.getLessonCountsByTopic();
   }
 
   String _formatDate(DateTime? date) {
@@ -75,6 +68,141 @@ class _TopicsScreenState extends State<TopicsScreen> {
       _editNameEnController.clear();
     });
   }
+  
+  Future<void> _addTopic() async {
+    final nameEsController = TextEditingController();
+    final nameEnController = TextEditingController();
+    final formKey = GlobalKey<FormState>();
+
+    final saved = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) {
+        return AlertDialog(
+          backgroundColor: Colors.white,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(12),
+          ),
+          title: Text(
+            'Añadir tópico',
+            style: AppTextStyles.h1.copyWith(
+              color: AppColors.darkBrown,
+            ),
+          ),
+          content: SizedBox(
+            width: 400,
+            child: Form(
+              key: formKey,
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  TextFormField(
+                    controller: nameEsController,
+                    decoration: const InputDecoration(
+                      labelText: 'Nombre en español',
+                      border: OutlineInputBorder(),
+                    ),
+                    validator: (value) {
+                      if (value == null || value.trim().isEmpty) {
+                        return 'Ingresa el nombre en español';
+                      }
+                      return null;
+                    },
+                  ),
+                  const SizedBox(height: 16),
+                  TextFormField(
+                    controller: nameEnController,
+                    decoration: const InputDecoration(
+                      labelText: 'Nombre en inglés',
+                      border: OutlineInputBorder(),
+                    ),
+                    validator: (value) {
+                      if (value == null || value.trim().isEmpty) {
+                        return 'Ingresa el nombre en inglés';
+                      }
+                      return null;
+                    },
+                  ),
+                ],
+              ),
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () =>
+                  Navigator.pop(dialogContext, false),
+              child: const Text('Cancelar'),
+            ),
+            ElevatedButton(
+              onPressed: () async {
+                if (!formKey.currentState!.validate()) {
+                  return;
+                }
+
+                try {
+                  final nameEs = nameEsController.text.trim();
+                  final nameEn = nameEnController.text.trim();
+
+                  final slug = nameEn
+                      .toLowerCase()
+                      .trim()
+                      .replaceAll(RegExp(r'[^a-z0-9]+'), '-')
+                      .replaceAll(RegExp(r'^-+|-+$'), '');
+
+                  await _topicService.createTopic(
+                    nameEs: nameEs,
+                    nameEn: nameEn,
+                    slug: slug,
+                  );
+
+                  if (dialogContext.mounted) {
+                    Navigator.pop(dialogContext, true);
+                  }
+                } catch (e) {
+                  debugPrint('ERROR CREANDO TÓPICO: $e');
+
+                  if (dialogContext.mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(
+                        content: Text(
+                          'No se pudo crear el tópico.',
+                        ),
+                      ),
+                    );
+                  }
+                }
+              },
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppColors.primary,
+                foregroundColor: Colors.white,
+              ),
+              child: const Text('Guardar tópico'),
+            ),
+          ],
+        );
+      },
+    );
+
+    nameEsController.dispose();
+    nameEnController.dispose();
+
+    if (saved == true && mounted) {
+      setState(() {
+        _topicsFuture = _topicService.searchTopics(
+          _searchController.text.trim(),
+          filter: _selectedFilter,
+        );
+        _lessonCountsFuture =
+            _topicService.getLessonCountsByTopic();
+      });
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Tópico creado correctamente.'),
+        ),
+      );
+    }
+  }
+
 
   Future<void> _searchTopics() async {
     setState(() {
@@ -85,14 +213,21 @@ class _TopicsScreenState extends State<TopicsScreen> {
     });
   }
 
-  void _changeFilter(String value) {
+  Future<void> _changeFilter(String value) async {
     setState(() {
       _selectedFilter = value;
+    });
 
-      _topicsFuture = _topicService.searchTopics(
-        _searchController.text.trim(),
-        filter: _selectedFilter,
-      );
+    final counts = await _lessonCountsFuture;
+
+    final topicsFuture = _topicService.searchTopics(
+      _searchController.text.trim(),
+      filter: value,
+      lessonCounts: counts,
+    );
+
+    setState(() {
+      _topicsFuture = topicsFuture;
     });
   }
 
@@ -110,7 +245,7 @@ class _TopicsScreenState extends State<TopicsScreen> {
 
   @override
   Widget build(BuildContext context) {
-    const double tableWidth = 1025;
+    const double tableWidth = 1175;
 
     return Padding(
       padding: const EdgeInsets.all(40),
@@ -136,20 +271,7 @@ class _TopicsScreenState extends State<TopicsScreen> {
             crossAxisAlignment: CrossAxisAlignment.center,
             children: [
               ElevatedButton.icon(
-                onPressed: () async {
-                  try {
-                    final topic = await _topicService.createTopic(
-                      nameEs: 'Psicología',
-                      nameEn: 'Psychology',
-                      slug: 'psychology',
-                    );
-
-                    print('TÓPICO CREADO: ${topic.nameEs}');
-                    print('SLUG: ${topic.slug}');
-                  } catch (e) {
-                    print('ERROR CREANDO TÓPICO: $e');
-                  }
-                },
+                onPressed: _addTopic,
                 icon: const Icon(Icons.add),
                 label: Text(
                   'Añadir tópico',
@@ -178,18 +300,27 @@ class _TopicsScreenState extends State<TopicsScreen> {
                     onSelected: _changeFilter,
                     itemBuilder: (context) => const [
                       PopupMenuItem(
-                        value: 'fecha',
-                        child: Text('Fecha'),
-                      ),
-                      PopupMenuItem(
-                        value: 'az',
-                        child: Text('A-Z'),
-                      ),
-                      PopupMenuItem(
                         value: 'za',
                         child: Text('Z-A'),
                       ),
+                      PopupMenuItem(
+                        value: 'recientes',
+                        child: Text('Más recientes'),
+                      ),
+                      PopupMenuItem(
+                        value: 'antiguos',
+                        child: Text('Más antiguos'),
+                      ),
+                      PopupMenuItem(
+                        value: 'mas_lecciones',
+                        child: Text('Más lecciones'),
+                      ),
+                      PopupMenuItem(
+                        value: 'menos_lecciones',
+                        child: Text('Menos lecciones'),
+                      ),
                     ],
+
                   ),
 
                   const SizedBox(width: 10),
@@ -270,15 +401,10 @@ class _TopicsScreenState extends State<TopicsScreen> {
 
                       child: DataTable(
                         columnSpacing: 0,
-
                         horizontalMargin: 0,
-
                         headingRowHeight: 55,
-
                         dataRowMinHeight: 0,
-
                         dataRowMaxHeight: 0,
-
                         headingRowColor:
                             WidgetStateProperty.all(
                           AppColors.green.withValues(alpha: 0.12),
@@ -289,11 +415,11 @@ class _TopicsScreenState extends State<TopicsScreen> {
 
                           DataColumn(
                             label: SizedBox(
-                              width: 180,
-
-                              child: Center(
-                                child: Text(
-                                  'Nombre ES',
+                              width: 250,
+                             child: Align(
+                              alignment: Alignment.centerLeft,
+                              child: Text(
+                                'Nombre ES',
                                   style: AppTextStyles.body.copyWith(
                                     color: AppColors.darkBrown,
                                     fontWeight: FontWeight.w600,
@@ -306,10 +432,11 @@ class _TopicsScreenState extends State<TopicsScreen> {
                           
                           DataColumn(
                             label: SizedBox(
-                              width: 180,
+                              width: 250,
 
-                              child: Center(
-                                child: Text(
+                              child: Align(
+                              alignment: Alignment.centerLeft,
+                              child: Text(
                                   'Nombre EN',
                                   style: AppTextStyles.body.copyWith(
                                     color: AppColors.darkBrown,
@@ -323,9 +450,9 @@ class _TopicsScreenState extends State<TopicsScreen> {
                           
                           DataColumn(
                             label: SizedBox(
-                              width: 180,
-
-                              child: Center(
+                              width: 220,
+                              child: Align(
+                                alignment: Alignment.centerLeft,
                                 child: Text(
                                   'Fecha de subida',
                                   style: AppTextStyles.body.copyWith(
@@ -340,10 +467,10 @@ class _TopicsScreenState extends State<TopicsScreen> {
                           
                           DataColumn(
                             label: SizedBox(
-                              width: 120,
-
-                              child: Center(
-                                child: Text(
+                              width: 150,
+                              child: Align(
+                              alignment: Alignment.centerLeft,
+                              child: Text(
                                   'Estado',
                                   style: AppTextStyles.body.copyWith(
                                     color: AppColors.darkBrown,
@@ -354,13 +481,28 @@ class _TopicsScreenState extends State<TopicsScreen> {
                             ),
                           ),
 
+                        DataColumn(
+                          label: SizedBox(
+                            width: 150,
+                            child: Align(
+                              alignment: Alignment.centerLeft,
+                              child: Text(
+                                'Lecciones',
+                                style: AppTextStyles.body.copyWith(
+                                  color: AppColors.darkBrown,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                            ),
+                          ),
+                        ),
                           
                           DataColumn(
                             label: SizedBox(
-                              width: 120,
-
-                              child: Center(
-                                child: Text(
+                              width: 155,
+                              child: Align(
+                              alignment: Alignment.centerLeft,
+                              child: Text(
                                   'Acciones',
                                   style: AppTextStyles.body.copyWith(
                                     color: AppColors.darkBrown,
@@ -405,31 +547,35 @@ class _TopicsScreenState extends State<TopicsScreen> {
                               columns: const [
                                 DataColumn(
                                   label: SizedBox(
-                                    width: 180,
+                                    width: 250,
                                   ),
                                 ),
 
                                 DataColumn(
                                   label: SizedBox(
-                                    width: 180,
+                                    width: 250,
                                   ),
                                 ),
 
                                 DataColumn(
                                   label: SizedBox(
-                                    width: 180,
+                                    width: 220,
                                   ),
                                 ),
 
                                 DataColumn(
                                   label: SizedBox(
-                                    width: 120,
+                                    width: 150,
                                   ),
                                 ),
 
                                 DataColumn(
+                                  label: SizedBox(width: 150),
+                                ),
+
+                                DataColumn(
                                   label: SizedBox(
-                                    width: 120,
+                                    width: 155,
                                   ),
                                 ),
                               ],
@@ -444,7 +590,7 @@ class _TopicsScreenState extends State<TopicsScreen> {
                                     DataCell(
                                       isEditing
                                           ? SizedBox(
-                                              width: 180,
+                                              width: 250,
 
                                               child: TextField(
                                                 controller:
@@ -479,7 +625,7 @@ class _TopicsScreenState extends State<TopicsScreen> {
                                     DataCell(
                                       isEditing
                                           ? SizedBox(
-                                              width: 180,
+                                              width: 250,
 
                                               child: TextField(
                                                 controller:
@@ -531,8 +677,7 @@ class _TopicsScreenState extends State<TopicsScreen> {
                                     
                                     DataCell(
                                       SizedBox(
-                                        width: 120,
-
+                                        width: 150,
                                         child: Align(
                                           alignment:
                                               Alignment.centerLeft,
@@ -572,8 +717,28 @@ class _TopicsScreenState extends State<TopicsScreen> {
 
                                     DataCell(
                                       SizedBox(
-                                        width: 120,
+                                        width: 150,
+                                        child: Align(
+                                          alignment: Alignment.centerLeft,
+                                          child: FutureBuilder<Map<String, int>>(
+                                            future: _lessonCountsFuture,
+                                            builder: (context, snapshot) {
+                                              final counts = snapshot.data ?? {};
+                                              return Text(
+                                                '${counts[topic.id] ?? 0}',
+                                                style: AppTextStyles.body.copyWith(
+                                                  color: AppColors.darkBrown,
+                                                ),
+                                              );
+                                            },
+                                          ),
+                                        ),
+                                      ),
+                                    ),
 
+                                    DataCell(
+                                      SizedBox(
+                                        width: 155,
                                         child: Row(
                                           mainAxisSize:
                                               MainAxisSize.min,

@@ -6,6 +6,7 @@ import '../../theme/app_colors.dart';
 import '../../theme/app_text_styles.dart';
 import 'lesson_detail_screen.dart';
 import '../import/import_content_screen.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
 class LessonScreen extends StatefulWidget {
   const LessonScreen({super.key});
@@ -52,6 +53,32 @@ class _LessonScreenState extends State<LessonScreen> {
     });
   }
 
+  Future<void> _changePublishedStatus(
+  Lesson lesson,
+  bool isPublished,
+) async {
+  try {
+    await Supabase.instance.client
+        .from('lessons')
+        .update({
+          'is_published': isPublished,
+        })
+        .eq('id', lesson.id);
+
+    setState(() {
+      _lessonsFuture = _loadLessons();
+    });
+  } catch (e) {
+    if (!mounted) return;
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('No se pudo cambiar el estado de la lección.'),
+      ),
+    );
+  }
+}
+
   @override
   void dispose() {
     _searchController.dispose();
@@ -66,6 +93,7 @@ class _LessonScreenState extends State<LessonScreen> {
         onBack: () {
           setState(() {
             _showImportScreen = false;
+            _lessonsFuture = _loadLessons();
           });
         },
       );
@@ -317,7 +345,7 @@ class _LessonScreenState extends State<LessonScreen> {
                           _buildHeader('Título ES', 210),
                           _buildHeader('Título EN', 210),
                           _buildHeader('Subtítulo ES', 300),
-                          _buildHeader('Publicado', 140, centered: true),
+                          _buildHeader('Estado', 140, centered: true),
                           _buildHeader('Acciones', 165, centered: true),
                         ],
                         rows: const [],
@@ -356,10 +384,7 @@ class _LessonScreenState extends State<LessonScreen> {
                                 ),
                               ],
                               rows: lessons.map((lesson) {
-                                print(
-                                  'LECCIÓN: ${lesson.titleEs} | isPublished: ${lesson.isPublished}',
-                                );
-                                return DataRow(
+                                  return DataRow(
                                   cells: [
                                     DataCell(
                                       SizedBox(
@@ -403,19 +428,34 @@ class _LessonScreenState extends State<LessonScreen> {
                                       ),
                                     ),
 
-                                   DataCell(
-                                    SizedBox(
-                                      width: 140,
-                                      child: Center(
+                                DataCell(
+                                  SizedBox(
+                                    width: 140,
+                                    child: Center(
+                                      child: PopupMenuButton<bool>(
+                                        tooltip: 'Cambiar estado',
+                                        onSelected: (value) {
+                                          _changePublishedStatus(lesson, value);
+                                        },
+                                        itemBuilder: (context) => [
+                                          if (lesson.isPublished == true)
+                                            const PopupMenuItem<bool>(
+                                              value: false,
+                                              child: Text('No publicado'),
+                                            )
+                                          else
+                                            const PopupMenuItem<bool>(
+                                              value: true,
+                                              child: Text('Publicado'),
+                                            ),
+                                        ],
                                         child: Container(
                                           padding: const EdgeInsets.symmetric(
                                             horizontal: 12,
                                             vertical: 6,
                                           ),
                                           decoration: BoxDecoration(
-                                            color: AppColors.green.withValues(
-                                              alpha: 0.20,
-                                            ),
+                                            color: AppColors.green.withValues(alpha: 0.20),
                                             borderRadius: BorderRadius.circular(20),
                                           ),
                                           child: Text(
@@ -431,6 +471,7 @@ class _LessonScreenState extends State<LessonScreen> {
                                       ),
                                     ),
                                   ),
+                                ),
 
                                     DataCell(
                                       SizedBox(

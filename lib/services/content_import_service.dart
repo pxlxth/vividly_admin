@@ -5,10 +5,12 @@ import 'excel_import.dart';
 class ContentImportResult {
   final String status;
   final String message;
+  final String? lessonId;
 
   ContentImportResult({
     required this.status,
     required this.message,
+    this.lessonId,
   });
 
   bool get imported => status == 'imported';
@@ -19,8 +21,9 @@ class ContentImportService {
   final SupabaseClient _supabase = Supabase.instance.client;
 
   Future<ContentImportResult> importLesson(
-    ExcelLessonData lesson,
-  ) async {
+    ExcelLessonData lesson, {
+    required bool isPublished,
+  }) async {
     try {
       final response = await _supabase.rpc(
         'import_lesson_content',
@@ -33,7 +36,7 @@ class ContentImportService {
           'p_subtitle_en': lesson.subtitleEn,
           'p_witness_name_es': lesson.witnessNameEs,
           'p_witness_name_en': lesson.witnessNameEn,
-
+          'p_is_published': isPublished,
           'p_initial_quiz_es': lesson.initialQuizEs
               .map(
                 (quiz) => {
@@ -91,11 +94,11 @@ class ContentImportService {
       );
 
       final data = Map<String, dynamic>.from(response);
-
       return ContentImportResult(
         status: data['status']?.toString() ?? 'error',
         message: data['message']?.toString() ??
             'No se recibió una respuesta válida.',
+        lessonId: data['lesson_id']?.toString(),
       );
     } catch (e) {
       return ContentImportResult(

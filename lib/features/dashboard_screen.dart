@@ -6,6 +6,9 @@ import 'topics/topics_screen.dart';
 import 'topics/topic_lessons_screen.dart';
 import 'lessons/lesson_screen.dart';
 import 'dashboard/admin_dashboard_content.dart';
+import '../../models/lesson.dart';
+import 'lessons/lesson_detail_screen.dart';
+
 
 class DashboardScreen extends StatefulWidget {
   final String initialSection;
@@ -23,6 +26,7 @@ class DashboardScreen extends StatefulWidget {
 
 class _DashboardScreenState extends State<DashboardScreen> {
   int _selectedIndex = 0;
+  Lesson? _selectedTopicLesson;
 
   String? _selectedTopicId;
   String? _selectedTopicName;
@@ -62,14 +66,15 @@ class _DashboardScreenState extends State<DashboardScreen> {
     }
   }
 
-
   Widget _createTopicsScreen() {
     return TopicsScreen(
       onTopicSelected: (topicId, topicName) {
         setState(() {
           _selectedTopicId = topicId;
           _selectedTopicName = topicName;
+          _selectedTopicLesson = null;
 
+          
           _topicLessonsScreen = TopicLessonsScreen(
             topicId: topicId,
             topicName: topicName,
@@ -77,7 +82,15 @@ class _DashboardScreenState extends State<DashboardScreen> {
               setState(() {
                 _selectedTopicId = null;
                 _selectedTopicName = null;
+                _selectedTopicLesson = null;
                 _topicLessonsScreen = null;
+              });
+            },
+            onLessonSelected: (lesson) {
+              debugPrint('Lección seleccionada: ${lesson.titleEs}');
+
+              setState(() {
+                _selectedTopicLesson = lesson;
               });
             },
           );
@@ -86,7 +99,24 @@ class _DashboardScreenState extends State<DashboardScreen> {
     );
   }
 
+
+
   Widget _getTopicsContent() {
+    
+    if (_selectedTopicLesson != null) {
+      return Material(
+        color: Colors.white,
+        child: LessonDetailScreen(
+          lesson: _selectedTopicLesson!,
+          onBack: () {
+            setState(() {
+              _selectedTopicLesson = null;
+            });
+          },
+        ),
+      );
+    }
+
     if (_selectedTopicId == null) {
       return _screens[1] ??= _createTopicsScreen();
     }
@@ -142,15 +172,13 @@ class _DashboardScreenState extends State<DashboardScreen> {
             ),
 
             Expanded(
-              child: IndexedStack(
-                index: _selectedIndex,
-                children: [
-                  _screens[0]!,
-
-                  _getTopicsContent(),
-
-                  _screens[2] ?? const SizedBox.shrink(),
-                ],
+              child: Align(
+                alignment: Alignment.topLeft,
+                child: _selectedIndex == 0
+                    ? _screens[0]!
+                    : _selectedIndex == 1
+                        ? _getTopicsContent()
+                        : _screens[2] ?? const SizedBox.shrink(),
               ),
             ),
           ],

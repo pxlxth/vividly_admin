@@ -23,7 +23,8 @@ class TopicService {
 
   Future<List<Topic>> searchTopics(
     String query, {
-    String filter = 'fecha',
+    String filter = 'az',
+    Map<String, int> lessonCounts = const {},
   }) async {
     try {
       var request = _supabase
@@ -42,32 +43,42 @@ class TopicService {
           .map((json) => Topic.fromJson(json))
           .toList();
 
-      switch (filter) {
-        case 'fecha':
-          topics.sort((a, b) {
-            if (a.createdAt == null) return 1;
-            if (b.createdAt == null) return -1;
+    switch (filter) {
+      case 'za':
+        topics.sort((a, b) =>
+            b.nameEs.toLowerCase().compareTo(a.nameEs.toLowerCase()));
+        break;
 
-            return b.createdAt!.compareTo(a.createdAt!);
-          });
-          break;
+      case 'recientes':
+        topics.sort((a, b) =>
+            (b.createdAt ?? DateTime(0))
+                .compareTo(a.createdAt ?? DateTime(0)));
+        break;
 
-        case 'az':
-          topics.sort(
-            (a, b) => a.nameEs.toLowerCase().compareTo(
-                  b.nameEs.toLowerCase(),
-                ),
-          );
-          break;
+      case 'antiguos':
+        topics.sort((a, b) =>
+            (a.createdAt ?? DateTime(0))
+                .compareTo(b.createdAt ?? DateTime(0)));
+        break;
 
-        case 'za':
-          topics.sort(
-            (a, b) => b.nameEs.toLowerCase().compareTo(
-                  a.nameEs.toLowerCase(),
-                ),
-          );
-          break;
-      }
+      case 'mas_lecciones':
+        topics.sort((a, b) =>
+            (lessonCounts[b.id] ?? 0)
+                .compareTo(lessonCounts[a.id] ?? 0));
+        break;
+
+      case 'menos_lecciones':
+        topics.sort((a, b) =>
+            (lessonCounts[a.id] ?? 0)
+                .compareTo(lessonCounts[b.id] ?? 0));
+        break;
+
+      case 'az':
+      default:
+        topics.sort((a, b) =>
+            a.nameEs.toLowerCase().compareTo(b.nameEs.toLowerCase()));
+        break;
+    }
 
       return topics;
     } catch (e) {
@@ -134,6 +145,31 @@ class TopicService {
       return [];
     }
   }
+
+
+  Future<Map<String, int>> getLessonCountsByTopic() async {
+    try {
+      final response = await _supabase
+          .from('lessons')
+          .select('topic_id');
+
+      final Map<String, int> counts = {};
+
+      for (final row in response as List) {
+        final topicId = row['topic_id'] as String?;
+
+        if (topicId != null) {
+          counts[topicId] = (counts[topicId] ?? 0) + 1;
+        }
+      }
+
+      return counts;
+    } catch (e) {
+      print('Error contando lecciones por tópico: $e');
+      return {};
+    }
+  }
+
 
   Future<Topic> createTopic({
     required String nameEs,

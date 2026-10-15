@@ -141,4 +141,28 @@ class LessonService {
       return false;
     }
   }
+
+  
+  Future<bool> updateLessonTopic(
+    String lessonId,
+    String topicId,
+  ) async {
+    try {
+      await _supabase
+          .from('lessons')
+          .update({
+            'topic_id': topicId,
+          })
+          .eq('id', lessonId);
+
+      print(
+        'TÓPICO ACTUALIZADO: $lessonId → $topicId',
+      );
+
+      return true;
+    } catch (e) {
+      print('ERROR ACTUALIZANDO TÓPICO: $e');
+      return false;
+    }
+  }
 }

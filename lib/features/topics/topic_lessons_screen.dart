@@ -5,17 +5,20 @@ import '../../services/lesson_service.dart';
 import '../../theme/app_colors.dart';
 import '../../theme/app_text_styles.dart';
 import '../lessons/lesson_detail_screen.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
 class TopicLessonsScreen extends StatefulWidget {
   final String topicId;
   final String topicName;
   final VoidCallback? onBack;
+  final ValueChanged<Lesson>? onLessonSelected;
 
   const TopicLessonsScreen({
     super.key,
     required this.topicId,
     required this.topicName,
     this.onBack,
+    this.onLessonSelected,
   });
 
   @override
@@ -24,16 +27,13 @@ class TopicLessonsScreen extends StatefulWidget {
 
 class _TopicLessonsScreenState extends State<TopicLessonsScreen> {
   final LessonService _lessonService = LessonService();
-
   final TextEditingController _searchController =
       TextEditingController();
-
   final ScrollController _verticalController =
       ScrollController();
-
   late Future<List<Lesson>> _lessonsFuture;
-
   String _selectedFilter = 'fecha';
+  Lesson? _selectedLesson;
 
   @override
   void initState() {
@@ -45,6 +45,37 @@ class _TopicLessonsScreenState extends State<TopicLessonsScreen> {
   void _loadLessons() {
     _lessonsFuture =
         _lessonService.getLessonsByTopic(widget.topicId);
+  }
+  
+  Future<void> _changePublishedStatus(
+    Lesson lesson,
+    bool isPublished,
+  ) async {
+    try {
+      await Supabase.instance.client
+          .from('lessons')
+          .update({
+            'is_published': isPublished,
+          })
+          .eq('id', lesson.id);
+
+      if (!mounted) return;
+
+      setState(() {
+        _lessonsFuture =
+            _lessonService.getLessonsByTopic(widget.topicId);
+      });
+    } catch (e) {
+      if (!mounted) return;
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+            'No se pudo cambiar el estado de la lección.',
+          ),
+        ),
+      );
+    }
   }
 
   String _formatDate(DateTime? date) {
@@ -117,6 +148,17 @@ class _TopicLessonsScreenState extends State<TopicLessonsScreen> {
   Widget build(BuildContext context) {
     const double tableWidth = 1025;
 
+
+  if (_selectedLesson != null) {
+    return LessonDetailScreen(
+      lesson: _selectedLesson!,
+      onBack: () {
+        setState(() {
+          _selectedLesson = null;
+        });
+      },
+    );
+  }
     return Scaffold(
       body: SafeArea(
         child: Row(
@@ -297,7 +339,9 @@ class _TopicLessonsScreenState extends State<TopicLessonsScreen> {
                                     DataColumn(
                                       label: SizedBox(
                                         width: 300,
-                                        child: Center(
+                                       
+                                        child: Align(
+                                          alignment: Alignment.centerLeft,
                                           child: Text(
                                             'Nombre ES',
                                             style: AppTextStyles.body
@@ -314,7 +358,8 @@ class _TopicLessonsScreenState extends State<TopicLessonsScreen> {
                                     DataColumn(
                                       label: SizedBox(
                                         width: 300,
-                                        child: Center(
+                                        child: Align(
+                                          alignment: Alignment.centerLeft,
                                           child: Text(
                                             'Nombre EN',
                                             style: AppTextStyles.body
@@ -331,8 +376,9 @@ class _TopicLessonsScreenState extends State<TopicLessonsScreen> {
                                     DataColumn(
                                       label: SizedBox(
                                         width: 180,
-                                        child: Center(
-                                          child: Text(
+                                        child: Align(
+                                        alignment: Alignment.centerLeft,
+                                        child: Text(
                                             'Fecha de subida',
                                             style: AppTextStyles.body
                                                 .copyWith(
@@ -348,8 +394,9 @@ class _TopicLessonsScreenState extends State<TopicLessonsScreen> {
                                     DataColumn(
                                       label: SizedBox(
                                         width: 140,
-                                        child: Center(
-                                          child: Text(
+                                        child: Align(
+                                        alignment: Alignment.centerLeft,
+                                        child: Text(
                                             'Estado',
                                             style: AppTextStyles.body
                                                 .copyWith(
@@ -365,8 +412,9 @@ class _TopicLessonsScreenState extends State<TopicLessonsScreen> {
                                     DataColumn(
                                       label: SizedBox(
                                         width: 125,
-                                        child: Center(
-                                          child: Text(
+                                        child: Align(
+                                        alignment: Alignment.centerLeft,
+                                        child: Text(
                                             'Acciones',
                                             style: AppTextStyles.body
                                                 .copyWith(
@@ -495,46 +543,47 @@ class _TopicLessonsScreenState extends State<TopicLessonsScreen> {
                                               ),
 
                                               // ESTADO
+                                             
                                               DataCell(
                                                 SizedBox(
                                                   width: 140,
                                                   child: Align(
-                                                    alignment:
-                                                        Alignment
-                                                            .centerLeft,
-                                                    child: Container(
-                                                      padding:
-                                                          const EdgeInsets
-                                                              .symmetric(
-                                                        horizontal: 12,
-                                                        vertical: 6,
-                                                      ),
-                                                      decoration:
-                                                          BoxDecoration(
-                                                        color: AppColors
-                                                            .green
-                                                            .withValues(
-                                                          alpha: 0.20,
+                                                    alignment: Alignment.centerLeft,
+                                                    child: PopupMenuButton<bool>(
+                                                      tooltip: 'Cambiar estado',
+                                                      onSelected: (value) {
+                                                        _changePublishedStatus(lesson, value);
+                                                      },
+                                                      itemBuilder: (context) => [
+                                                        if (lesson.isPublished == true)
+                                                          const PopupMenuItem<bool>(
+                                                            value: false,
+                                                            child: Text('No publicado'),
+                                                          )
+                                                        else
+                                                          const PopupMenuItem<bool>(
+                                                            value: true,
+                                                            child: Text('Publicado'),
+                                                          ),
+                                                      ],
+                                                      child: Container(
+                                                        padding: const EdgeInsets.symmetric(
+                                                          horizontal: 12,
+                                                          vertical: 6,
                                                         ),
-                                                        borderRadius:
-                                                            BorderRadius
-                                                                .circular(
-                                                          20,
+                                                        decoration: BoxDecoration(
+                                                          color: AppColors.green.withValues(alpha: 0.20),
+                                                          borderRadius: BorderRadius.circular(20),
                                                         ),
-                                                      ),
-                                                      child: Text(
-                                                        lesson.isPublished ==
-                                                                true
-                                                            ? 'Publicado'
-                                                            : 'No publicado',
-                                                        softWrap: false,
-                                                        style:
-                                                            AppTextStyles
-                                                                .body
-                                                                .copyWith(
-                                                          color: AppColors
-                                                              .darkBrown,
-                                                          fontSize: 13,
+                                                        child: Text(
+                                                          lesson.isPublished == true
+                                                              ? 'Publicado'
+                                                              : 'No publicado',
+                                                          softWrap: false,
+                                                          style: AppTextStyles.body.copyWith(
+                                                            color: AppColors.darkBrown,
+                                                            fontSize: 13,
+                                                          ),
                                                         ),
                                                       ),
                                                     ),
@@ -557,26 +606,14 @@ class _TopicLessonsScreenState extends State<TopicLessonsScreen> {
                                                         ),
                                                         tooltip: 'Ver',
                                                         onPressed: () {
-                                                          Navigator.push(
-                                                            context,
-                                                            MaterialPageRoute(
-                                                              builder:
-                                                                  (context) =>
-                                                                      LessonDetailScreen(
-                                                                lesson:
-                                                                    lesson,
-                                                              ),
-                                                            ),
-                                                          );
+                                                          if (widget.onLessonSelected != null) {
+                                                            widget.onLessonSelected!(lesson);
+                                                          } else {
+                                                            setState(() {
+                                                              _selectedLesson = lesson;
+                                                            });
+                                                          }
                                                         },
-                                                      ),
-                                                      IconButton(
-                                                        icon: const Icon(
-                                                          Icons
-                                                              .edit_outlined,
-                                                        ),
-                                                        tooltip: 'Editar',
-                                                        onPressed: () {},
                                                       ),
                                                     ],
                                                   ),
