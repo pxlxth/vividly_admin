@@ -638,9 +638,27 @@ ArchiveFile? _findMultimediaFile(
 
   Widget _buildLessonHeader(ExcelLessonData lesson) {
     final multimedia = _getMultimediaForLesson(lesson);
-    final multimediaWarnings = multimedia == null
-    ? ['No se encontró multimedia asociada a esta lección.']
-    : multimedia.warnings;
+final lessonId = _normalize(lesson.titleEs);
+
+final draftFileNames = _draftService
+    .getFileNames(lessonId)
+    .map((name) => name.toLowerCase().split('/').last)
+    .toSet();
+
+final multimediaWarnings = multimedia == null
+    ? <String>['No se encontró multimedia asociada a esta lección.']
+    : multimedia.warnings.where((warning) {
+        final match = RegExp(
+          r'([a-zA-Z0-9_-]+\.(?:png|jpg|jpeg|mp4|wav|mp3))',
+          caseSensitive: false,
+        ).firstMatch(warning);
+
+        if (match == null) return true;
+
+        final fileName = match.group(1)!.toLowerCase();
+
+        return !draftFileNames.contains(fileName);
+      }).toList();
 
     return Container(
       width: double.infinity,

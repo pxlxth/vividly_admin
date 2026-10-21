@@ -113,6 +113,43 @@ class _ImportContentScreenState extends State<ImportContentScreen> {
 
   return null;
 }
+List<String> _getCurrentMultimediaWarnings(
+  ExcelLessonData lesson,
+) {
+  final multimedia = _getMultimediaForLesson(lesson);
+
+  if (multimedia == null) {
+  final lessonId = _normalizeLessonId(lesson.titleEs);
+  final draftFileNames = MultimediaImportDraftService.instance
+      .getFileNames(lessonId);
+
+  if (draftFileNames.isNotEmpty) {
+    return [];
+  }
+
+  return ['No se encontró multimedia asociada a esta lección.'];
+}
+
+  final lessonId = _normalizeLessonId(lesson.titleEs);
+
+  final draftFileNames = MultimediaImportDraftService.instance
+      .getFileNames(lessonId)
+      .map((name) => name.toLowerCase().split('/').last)
+      .toSet();
+
+  return multimedia.warnings.where((warning) {
+    final match = RegExp(
+      r'([a-zA-Z0-9_-]+\.(?:png|jpg|jpeg|mp4|wav|mp3))',
+      caseSensitive: false,
+    ).firstMatch(warning);
+
+    if (match == null) return true;
+
+    return !draftFileNames.contains(
+      match.group(1)!.toLowerCase(),
+    );
+  }).toList();
+}
 
 Future<void> _pickMultimediaZip() async {
   try {
@@ -928,14 +965,9 @@ String _normalizeLessonId(String value) {
                                        const SizedBox(width: 10),
                     _StatusBadge(
                       label: '${_parsedLessons.where((lesson) {
-                        final multimediaPreview = _getMultimediaForLesson(lesson);
-
-                        final multimediaWarningCount = multimediaPreview == null
-                            ? 1
-                            : multimediaPreview.warnings.length;
-                        return lesson.warnings.isNotEmpty ||
-                            multimediaWarningCount > 0;
-                      }).length} con advertencias',
+  return lesson.warnings.isNotEmpty ||
+      _getCurrentMultimediaWarnings(lesson).isNotEmpty;
+}).length} con advertencias',
                       color: Colors.orange,
                     ),
                   ],
@@ -960,29 +992,31 @@ String _normalizeLessonId(String value) {
                         final lessonIndex = _filteredLessonIndexes[index];
                         final lesson = _parsedLessons[lessonIndex];
                         //final hasErrors = !lesson.isValid;
-                        final multimediaPreview = _getMultimediaForLesson(lesson);
+                         final multimediaWarningCount =
+    _getCurrentMultimediaWarnings(lesson).length;
 
-                        final multimediaWarningCount = multimediaPreview == null
-                            ? 1
-                            : multimediaPreview.warnings.length;                        
-                            final warningCount =
-                              lesson.warnings.length + multimediaWarningCount;
+final warningCount =
+    lesson.warnings.length + multimediaWarningCount;
                         return Material(
                           color: Colors.transparent,
                           child: InkWell(
-                            onTap: () {
-                              Navigator.of(context).push(
-                                MaterialPageRoute(
-                                  builder: (_) => LessonReviewScreen(
-                                    lessons: _parsedLessons,
-                                    initialIndex: lessonIndex,
-                                    multimediaPreviews: _multimediaPreviews,
-                                    multimediaZipBytes: _multimediaZips
-                                        .map((zip) => zip.bytes)
-                                        .toList(),
-                                  ),
+                            onTap: () async {
+                              await Navigator.of(context).push(
+                              MaterialPageRoute(
+                                builder: (_) => LessonReviewScreen(
+                                  lessons: _parsedLessons,
+                                  initialIndex: lessonIndex,
+                                  multimediaPreviews: _multimediaPreviews,
+                                  multimediaZipBytes: _multimediaZips
+                                      .map((zip) => zip.bytes)
+                                      .toList(),
                                 ),
-                              );
+                              ),
+                            );
+
+                            if (mounted) {
+                              setState(() {});
+                            }
                             },
                             child: ListTile(
                               leading: Row(
